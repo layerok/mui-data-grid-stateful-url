@@ -1,13 +1,12 @@
 import {
   DataGridPremium,
-  GridColDef, GridFilterItem,
+  GridColDef,
   GridFilterModel,
   GridPaginationModel,
   GridRowsProp,
   GridSortModel
 } from "@mui/x-data-grid-premium";
 import {useNavigate, useSearchParams} from "react-router-dom";
-import {useCallback, useMemo} from "react";
 
 const columns: GridColDef[] = [
   { field: 'col1', headerName: 'Column 1', width: 150 },
@@ -15,9 +14,9 @@ const columns: GridColDef[] = [
 ];
 
 enum SearchParamNames  {
-  Sort = 'sort',
-  Page = 'page',
-  PageSize = 'pageSize'
+  SortModel = 'sortModel',
+  PaginationModel = 'paginationModel',
+  FilterModel = 'filterModel'
 }
 
 const createHeaderFilterSearchParamKeys = (field: string) => {
@@ -40,24 +39,25 @@ const fetchRows = (offset: number, limit: number) => {
   }
 }
 export const HomePage = () => {
-  const [searchParams] = useSearchParams();
+
   const defaultPage = 0;
   const defaultPageSize = 3;
   const modelsControlledByUrl = {
     ...useSortModelControlledByUrl({
-      searchParamKey: SearchParamNames.Sort
+      searchParamName: SearchParamNames.SortModel
     }),
     ...usePaginationModelControlledByUrl({
-      pageSizeSearchParamKey: SearchParamNames.PageSize,
-      pageSearchParamKey: SearchParamNames.Page,
       defaultPageSize: defaultPageSize,
-      defaultPage: defaultPage
+      defaultPage: defaultPage,
+      searchParamName: SearchParamNames.PaginationModel
     }),
-    ...useFilterModelControlledByUrl(columns)
+    ...useFilterModelControlledByUrl({
+      searchParamName: SearchParamNames.FilterModel
+    })
   }
 
-  const page = +(searchParams.get(SearchParamNames.Page) || defaultPage)
-  const pageSize = +(searchParams.get(SearchParamNames.PageSize) || defaultPageSize)
+  const {pageSize, page} = modelsControlledByUrl.paginationModel
+
   const res = fetchRows(page * pageSize, pageSize)
 
   return <DataGridPremium
@@ -75,130 +75,95 @@ export const HomePage = () => {
   />
 }
 
-const useFilterModelControlledByUrl = (columns: GridColDef[]) => {
+const useFilterModelControlledByUrl = ({
+  searchParamName = 'filterModel'
+                                       }: {
+  searchParamName?: string
+} = {}) => {
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
 
-  const onFilterModelChange = useCallback((model: GridFilterModel) => {
-    columns.forEach(col => {
-      const {filterKey,filterModeKey} = createHeaderFilterSearchParamKeys(col.field);
-      searchParams.delete(filterKey)
-      searchParams.delete(filterModeKey)
-    })
-
-    model.items.forEach((item) => {
-      const {filterKey,filterModeKey} = createHeaderFilterSearchParamKeys(item.field);
-      searchParams.set(filterKey, item.value);
-      searchParams.set(filterModeKey, item.operator);
-    })
+  const onFilterModelChange = (model: GridFilterModel) => {
+    if(!model.items.length) {
+      searchParams.delete(searchParamName);
+    } else {
+      searchParams.set(searchParamName, JSON.stringify(model));
+    }
 
     navigate({
       search: searchParams.toString()
     })
-  }, [navigate, searchParams, columns]);
+  };
 
-  const filterModel: GridFilterModel = useMemo(() => ({
-    items: columns.map(column => {
-      const {filterKey,filterModeKey} = createHeaderFilterSearchParamKeys(column.field);
-      const value = searchParams.get(filterKey);
-      const operator = searchParams.get(filterModeKey);
+  const serializedFilterModel = searchParams.get(searchParamName)
 
-      return {
-        id: column.field,
-        value,
-        operator,
-        field: column.field
-      };
-    }).filter((filter) => !!filter.value)
-  }), [columns, searchParams])
+  const filterModel = serializedFilterModel ? JSON.parse(serializedFilterModel): {
+    items: []
+  }
 
- // console.log('filter', filterModel)
-
-  return useMemo(() => ({
+  return {
     onFilterModelChange,
-   filterModel
-  }), [onFilterModelChange, filterModel])
+    filterModel,
+  };
 }
 
 const usePaginationModelControlledByUrl = ({
-  pageSearchParamKey,
-  pageSizeSearchParamKey,
   defaultPage = 1,
-  defaultPageSize = 25
+  defaultPageSize = 25,
+  searchParamName = 'paginationModel'
                                         }: {
-  pageSearchParamKey: string,
-  pageSizeSearchParamKey: string,
   defaultPageSize?: number,
-  defaultPage?: number
-}) => {
+  defaultPage?: number,
+  searchParamName?: string;
+} = {}) => {
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
-  const onPaginationModelChange = useCallback((model: GridPaginationModel) => {
-    searchParams.set(pageSearchParamKey, model.page + "");
-    searchParams.set(pageSizeSearchParamKey, model.pageSize + "");
+  const onPaginationModelChange =(model: GridPaginationModel) => {
+    searchParams.set(searchParamName, JSON.stringify(model));
+
     navigate({
       search: searchParams.toString()
     })
-  }, [searchParams, navigate, pageSearchParamKey, pageSizeSearchParamKey])
+  };
 
-  const currentPage = +(searchParams.get(pageSearchParamKey) || defaultPage);
-  const currentPageSize = +(searchParams.get(pageSizeSearchParamKey) || defaultPageSize);
+  const serializedModel = searchParams.get(searchParamName);
+  const paginationModel = serializedModel ? JSON.parse(serializedModel): {
+    page:  defaultPage,
+    pageSize: defaultPageSize
+  }
 
-  const paginationModel: GridPaginationModel = useMemo(() => ({
-    page: currentPage,
-    pageSize:  currentPageSize
-  }), [currentPage, currentPageSize])
-
-  return useMemo(() => ({
+  return {
     onPaginationModelChange,
     paginationModel
-  }), [onPaginationModelChange, paginationModel])
+  }
 }
 
 const useSortModelControlledByUrl = ({
-  searchParamKey = "sort",
-  delimiter = ',',
-  descendingPrefix = '-'
-                                  }: {
-  searchParamKey?: string,
-  delimiter?: string,
-  descendingPrefix?: string
-}) => {
+  searchParamName = 'sortModel'
+                                     }: {
+  searchParamName?: string;
+} = {}) => {
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
 
-  const onSortModelChange = useCallback((model: GridSortModel) => {
-    searchParams.delete(searchParamKey)
-
-    const sorts = model.filter((item) => item.sort).map((item) => {
-      return item.sort === "asc" ? item.field: `${descendingPrefix}${item.field}`;
-    })
-
-    if(sorts.length > 0) {
-      searchParams.set(searchParamKey, sorts.join(delimiter))
+  const onSortModelChange = (model: GridSortModel) => {
+    if(model.length) {
+      searchParams.set(searchParamName, JSON.stringify(model));
+    } else {
+      searchParams.delete(searchParamName)
     }
 
     navigate({
       search: searchParams.toString()
     })
-  }, [searchParams, navigate, delimiter, descendingPrefix, searchParamKey]);
+  }
 
-  const sortValue = searchParams.get(searchParamKey)
+  const serializedModel = searchParams.get(searchParamName);
 
-  const sortModel: GridSortModel = useMemo(() => (sortValue ? sortValue.split(delimiter): []).map((value) => {
-    const isDesc = value.startsWith(descendingPrefix);
+  const sortModel = serializedModel ? JSON.parse(serializedModel): []
 
-    const field = isDesc ? value.slice(1, value.length): value;
-    const sort = isDesc ? 'desc': 'asc';
-
-    return {
-      sort,
-      field
-    }
-  }), [sortValue, descendingPrefix, delimiter])
-
-  return useMemo(() => ({
+  return {
     onSortModelChange,
     sortModel
-  }), [onSortModelChange, sortModel])
+  }
 }
