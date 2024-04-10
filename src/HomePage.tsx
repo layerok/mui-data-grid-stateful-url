@@ -29,12 +29,18 @@ const convertSortModalToBackendSort = (sortModel: GridSortModel) => {
   return undefined;
 }
 
-const createHeaderFilterSearchParamKeys = (field: string) => {
-  return {
-    filterKey: `filter[${field}]`,
-    filterModeKey: `filter_mode[${field}]`,
+const convertFilterModalToBackendFilters = (filterModel: GridFilterModel) => {
+  if(filterModel.items.length > 0) {
+    return filterModel.items.reduce((acc, item) => {
+      return {
+        ...acc,
+        [item.field]: item.value
+      }
+    }, {})
   }
+  return undefined;
 }
+
 const rows: GridRowsProp = [
   { id: 1, col1: 'Hello', col2: 'World' },
   { id: 2, col1: 'DataGridPro', col2: 'is Awesome' },
@@ -45,12 +51,19 @@ const rows: GridRowsProp = [
 const fetchRows = (params: {
   offset: number,
   limit: number,
-  sort?: string
+  sort?: string,
+  filter?: Record<string, string>
 }) => {
-  const {offset, limit, sort } = params;
+  const {offset, limit, sort, filter = {} } = params;
   console.log(params);
 
-  const sortedRows = [...rows];
+  const filteredRows = rows.filter(row => {
+
+    const keys = Object.keys(filter);
+    return keys.every(key => !row[key] || row[key].includes(filter[key]))
+  })
+
+  const sortedRows = [...filteredRows];
 
   if(sort) {
     sortedRows.sort(sortBy(sort))
@@ -84,6 +97,7 @@ export const HomePage = () => {
   const res = fetchRows({
     offset: page * pageSize,
     limit: pageSize,
+    filter: convertFilterModalToBackendFilters(modelsControlledByUrl.filterModel),
     sort: convertSortModalToBackendSort(modelsControlledByUrl.sortModel)
   }, )
 
