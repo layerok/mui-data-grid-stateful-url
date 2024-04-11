@@ -8,11 +8,14 @@ import {
 } from "@mui/x-data-grid-premium";
 import {useNavigate, useSearchParams} from "react-router-dom";
 import sortBy from 'sort-by';
+import {useState} from "react";
 
 const columns: GridColDef[] = [
   { field: 'col1', headerName: 'Column 1', width: 150 },
   { field: 'col2', headerName: 'Column 2', width: 150 },
 ];
+
+// { items: [{field: id, id: 4343, operator: start_with, value: 34343},{field: id, id: 44444, operator: start_with, value: 34343}], logicOperator: 'or'}
 
 enum SearchParamNames  {
   SortModel = 'sortModel',
@@ -88,7 +91,8 @@ export const HomePage = () => {
       searchParamName: SearchParamNames.PaginationModel
     }),
     ...useFilterModelControlledByUrl({
-      searchParamName: SearchParamNames.FilterModel
+      filterModelSearchName: SearchParamNames.FilterModel,
+      paginationModelSearchName: SearchParamNames.PaginationModel,
     })
   }
 
@@ -109,7 +113,6 @@ export const HomePage = () => {
     sortingMode={'server'}
     {...modelsControlledByUrl}
     disableMultipleColumnsSorting
-    disableMultipleColumnsFiltering
     headerFilters
     rows={res.data}
     columns={columns}
@@ -117,18 +120,21 @@ export const HomePage = () => {
 }
 
 const useFilterModelControlledByUrl = ({
-  searchParamName = 'filterModel'
+  filterModelSearchName = 'filterModel',
+  paginationModelSearchName = 'paginationModel',
                                        }: {
-  searchParamName?: string
+  filterModelSearchName?: string
+  paginationModelSearchName?: string
 } = {}) => {
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
 
   const onFilterModelChange = (model: GridFilterModel) => {
+    searchParams.delete(paginationModelSearchName);
     if(!model.items.length) {
-      searchParams.delete(searchParamName);
+      searchParams.delete(filterModelSearchName);
     } else {
-      searchParams.set(searchParamName, JSON.stringify(model));
+      searchParams.set(filterModelSearchName, JSON.stringify(model));
     }
 
     navigate({
@@ -136,7 +142,7 @@ const useFilterModelControlledByUrl = ({
     })
   };
 
-  const serializedFilterModel = searchParams.get(searchParamName)
+  const serializedFilterModel = searchParams.get(filterModelSearchName)
 
   const filterModel: GridFilterModel = serializedFilterModel ? JSON.parse(serializedFilterModel): {
     items: []
@@ -151,16 +157,22 @@ const useFilterModelControlledByUrl = ({
 const usePaginationModelControlledByUrl = ({
   defaultPage = 1,
   defaultPageSize = 25,
-  searchParamName = 'paginationModel'
+  searchParamName = 'paginationModel',
+  autoPageSize = false
                                         }: {
   defaultPageSize?: number,
   defaultPage?: number,
   searchParamName?: string;
+  autoPageSize?: boolean;
 } = {}) => {
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
+  const [autoPageSized, setAutoPageSized] = useState(false);
   const onPaginationModelChange =(model: GridPaginationModel) => {
     searchParams.set(searchParamName, JSON.stringify(model));
+    if(autoPageSize && !autoPageSized) {
+      setAutoPageSized(true);
+    }
 
     navigate({
       search: searchParams.toString()
@@ -169,8 +181,12 @@ const usePaginationModelControlledByUrl = ({
 
   const serializedModel = searchParams.get(searchParamName);
   const paginationModel: GridPaginationModel = serializedModel ? JSON.parse(serializedModel): {
-    page:  defaultPage,
-    pageSize: defaultPageSize
+    page: autoPageSize ? 0:  defaultPage,
+    pageSize: autoPageSize ? 0: defaultPageSize
+  }
+
+  if(autoPageSize && !autoPageSized) {
+    paginationModel.pageSize = 0;
   }
 
   return {
