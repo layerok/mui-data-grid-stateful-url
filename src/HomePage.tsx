@@ -50,6 +50,12 @@ const rows: GridRowsProp = [
   { id: 3, col1: 'MUI', col2: 'is Amazing' },
   { id: 4, col1: 'DataGridPro2', col2: 'is Awesome f' },
   { id: 5, col1: 'MUI2', col2: 'is Amazing f' },
+  { id: 6, col1: 'Hello', col2: 'World' },
+  { id: 7, col1: 'DataGridPro', col2: 'is Awesome' },
+  { id: 8, col1: 'MUI', col2: 'is Amazing' },
+  { id: 9, col1: 'DataGridPro2', col2: 'is Awesome f' },
+  { id: 10, col1: 'MUI2', col2: 'is Amazing f' },
+  { id: 11, col1: 'MUI2', col2: 'is Amazing f' },
 ];
 const fetchRows = (params: {
   offset: number,
@@ -58,7 +64,6 @@ const fetchRows = (params: {
   filter?: Record<string, string>
 }) => {
   const {offset, limit, sort, filter = {} } = params;
-  console.log(params);
 
   const filteredRows = rows.filter(row => {
 
@@ -81,37 +86,47 @@ const fetchRows = (params: {
 }
 export const HomePage = () => {
 
-  const modelsControlledByUrl = {
-    ...useSortModelControlledByUrl({
-      searchParamName: SearchParamNames.SortModel
-    }),
-    ...usePaginationModelControlledByUrl({
-      defaultPageSize: 3,
-      defaultPage: 0,
-      searchParamName: SearchParamNames.PaginationModel
-    }),
-    ...useFilterModelControlledByUrl({
-      filterModelSearchName: SearchParamNames.FilterModel,
-      paginationModelSearchName: SearchParamNames.PaginationModel,
-    })
-  }
+  const [sortModel, setSortModel] = useSortModelControlledByUrl({
+    searchParamName: SearchParamNames.SortModel
+  });
 
-  const {pageSize, page} = modelsControlledByUrl.paginationModel
+  const [paginationModel, setModel] = usePaginationModelControlledByUrl({
+    defaultPageSize: 0,
+    defaultPage: 0,
+    autoPageSize: true,
+    searchParamName: SearchParamNames.PaginationModel
+  })
+
+  const [filterModel, setFilterModel] = useFilterModelControlledByUrl({
+    filterModelSearchName: SearchParamNames.FilterModel,
+    paginationModelSearchName: SearchParamNames.PaginationModel,
+  })
+
+  const {pageSize, page} = paginationModel
 
   const res = fetchRows({
     offset: page * pageSize,
     limit: pageSize,
-    filter: convertFilterModalToBackendFilters(modelsControlledByUrl.filterModel),
-    sort: convertSortModalToBackendSort(modelsControlledByUrl.sortModel)
-  }, )
+    filter: convertFilterModalToBackendFilters(filterModel),
+    sort: convertSortModalToBackendSort(sortModel)
+  })
 
   return <DataGridPremium
+    sx={{
+      height: 300
+    }}
     rowCount={res.count}
     pagination
+    autoPageSize
     paginationMode={'server'}
     filterMode={'server'}
     sortingMode={'server'}
-    {...modelsControlledByUrl}
+    sortModel={sortModel}
+    onSortModelChange={setSortModel}
+    paginationModel={paginationModel}
+    onPaginationModelChange={setModel}
+    filterModel={filterModel}
+    onFilterModelChange={setFilterModel}
     disableMultipleColumnsSorting
     headerFilters
     rows={res.data}
@@ -129,7 +144,7 @@ const useFilterModelControlledByUrl = ({
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
 
-  const onFilterModelChange = (model: GridFilterModel) => {
+  const setModel = (model: GridFilterModel) => {
     searchParams.delete(paginationModelSearchName);
     if(!model.items.length) {
       searchParams.delete(filterModelSearchName);
@@ -144,14 +159,11 @@ const useFilterModelControlledByUrl = ({
 
   const serializedFilterModel = searchParams.get(filterModelSearchName)
 
-  const filterModel: GridFilterModel = serializedFilterModel ? JSON.parse(serializedFilterModel): {
+  const model: GridFilterModel = serializedFilterModel ? JSON.parse(serializedFilterModel): {
     items: []
   }
 
-  return {
-    onFilterModelChange,
-    filterModel,
-  };
+  return [model, setModel] as const;
 }
 
 const usePaginationModelControlledByUrl = ({
@@ -168,7 +180,7 @@ const usePaginationModelControlledByUrl = ({
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
   const [autoPageSized, setAutoPageSized] = useState(false);
-  const onPaginationModelChange =(model: GridPaginationModel) => {
+  const setModel =(model: GridPaginationModel) => {
     searchParams.set(searchParamName, JSON.stringify(model));
     if(autoPageSize && !autoPageSized) {
       setAutoPageSized(true);
@@ -180,19 +192,16 @@ const usePaginationModelControlledByUrl = ({
   };
 
   const serializedModel = searchParams.get(searchParamName);
-  const paginationModel: GridPaginationModel = serializedModel ? JSON.parse(serializedModel): {
+  const model: GridPaginationModel = serializedModel ? JSON.parse(serializedModel): {
     page: autoPageSize ? 0:  defaultPage,
     pageSize: autoPageSize ? 0: defaultPageSize
   }
 
   if(autoPageSize && !autoPageSized) {
-    paginationModel.pageSize = 0;
+    model.pageSize = 0;
   }
 
-  return {
-    onPaginationModelChange,
-    paginationModel
-  }
+  return [model, setModel] as const;
 }
 
 const useSortModelControlledByUrl = ({
@@ -203,7 +212,7 @@ const useSortModelControlledByUrl = ({
   const [searchParams, ] = useSearchParams();
   const navigate = useNavigate();
 
-  const onSortModelChange = (model: GridSortModel) => {
+  const setModel = (model: GridSortModel) => {
     if(model.length) {
       searchParams.set(searchParamName, JSON.stringify(model));
     } else {
@@ -217,10 +226,7 @@ const useSortModelControlledByUrl = ({
 
   const serializedModel = searchParams.get(searchParamName);
 
-  const sortModel: GridSortModel = serializedModel ? JSON.parse(serializedModel): []
+  const model: GridSortModel = serializedModel ? JSON.parse(serializedModel): []
 
-  return {
-    onSortModelChange,
-    sortModel
-  }
+  return [model, setModel] as const;
 }
