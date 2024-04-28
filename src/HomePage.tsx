@@ -86,6 +86,7 @@ const fetchRows = async (params: {
     sortedRows.sort(sortBy(sort));
   }
 
+  // I don't paginate rows when limit is zero
   const paginatedRows =
     limit === 0 ? sortedRows : sortedRows.slice(offset, offset + limit);
 
@@ -103,7 +104,7 @@ export const HomePage = () => {
     sortModel,
     setSortModel,
     goToPage,
-    calculatedPageSize,
+    autoCalculatedPageSize,
   } = useDataGridUrlState();
 
   const { page } = paginationModel;
@@ -114,8 +115,8 @@ export const HomePage = () => {
   const [loading, setLoading] = useState(false);
 
   const params = {
-    offset: page * calculatedPageSize,
-    limit: calculatedPageSize,
+    offset: page * autoCalculatedPageSize,
+    limit: autoCalculatedPageSize,
     filter: convertFilterModalToBackendFilters(filterModel),
     sort: convertSortModalToBackendSort(sortModel),
   };
@@ -136,6 +137,14 @@ export const HomePage = () => {
   const rows = (data || previousData)?.data || [];
   const rowCount = (data || previousData)?.count || 0;
 
+  // I can't paginate rows when autoCalculatedPageSize is zero
+  // therefore I fetch all rows on a single page
+  const totalPages = autoCalculatedPageSize
+    ? Math.ceil(rowCount / autoCalculatedPageSize)
+    : 1;
+
+  const pageSize = autoCalculatedPageSize || rowCount;
+
   return (
     <div>
       <div
@@ -146,18 +155,14 @@ export const HomePage = () => {
         {!!rowCount && (
           <div style={{ display: "flex", gap: 20 }}>
             <Pagination
-              max={
-                calculatedPageSize
-                  ? Math.ceil(rowCount / calculatedPageSize)
-                  : 1
-              }
+              max={totalPages}
               page={page + 1}
               onPageChange={(page) => goToPage(page - 1)}
             />
             <HelperPaginationText
               count={rowCount}
               page={page + 1}
-              pageSize={calculatedPageSize || rowCount}
+              pageSize={pageSize}
             />
           </div>
         )}
@@ -257,7 +262,7 @@ const useDataGridUrlState = (
 ) => {
   const { page = 0, pageSize = 25, autoPageSize = true } = props;
   const [searchParams, setSearchParams] = useSearchParams();
-  const [calculatedPageSize, setCalculatedPageSize] = useState(0);
+  const [autoCalculatedPageSize, setAutoCalculatedPageSize] = useState(0);
 
   // eslint-disable-next-line
   const serialize = (data: any) => JSON.stringify(data);
@@ -298,9 +303,10 @@ const useDataGridUrlState = (
       };
 
   const setPaginationModel = (model: GridPaginationModel) => {
-    if (model.pageSize) {
-      setCalculatedPageSize(model.pageSize);
-    }
+    // uncomment lines below to fix the bug
+    //if (model.pageSize) {
+    setAutoCalculatedPageSize(model.pageSize);
+    //}
 
     searchParams.set(SearchParamNames.PaginationModel, serialize(model));
 
@@ -339,6 +345,6 @@ const useDataGridUrlState = (
     filterModel,
     setFilterModel,
     goToPage,
-    calculatedPageSize,
+    autoCalculatedPageSize,
   };
 };
