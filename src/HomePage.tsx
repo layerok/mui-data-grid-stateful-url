@@ -98,11 +98,11 @@ const fetchRows = async (params: {
 export const HomePage = () => {
   const {
     paginationModel,
-    setPaginationModel,
+    handlePaginationModelChange,
     filterModel,
-    setFilterModel,
+    handleFilterModelChange,
     sortModel,
-    setSortModel,
+    handleSortModel,
     goToPage,
     autoCalculatedPageSize,
   } = useDataGridUrlState();
@@ -137,8 +137,8 @@ export const HomePage = () => {
   const rows = (data || previousData)?.data || [];
   const rowCount = (data || previousData)?.count || 0;
 
-  // I can't paginate rows when autoCalculatedPageSize is zero
-  // therefore I fetch all rows on a single page
+  // I fetch all rows on a single page when autoCalculatedPageSize is zero
+  // therefore I show to user that there is only one page
   const totalPages = autoCalculatedPageSize
     ? Math.ceil(rowCount / autoCalculatedPageSize)
     : 1;
@@ -181,11 +181,11 @@ export const HomePage = () => {
         filterMode={"server"}
         sortingMode={"server"}
         sortModel={sortModel}
-        onSortModelChange={setSortModel}
+        onSortModelChange={handleSortModel}
         paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
+        onPaginationModelChange={handlePaginationModelChange}
         filterModel={filterModel}
-        onFilterModelChange={setFilterModel}
+        onFilterModelChange={handleFilterModelChange}
         disableMultipleColumnsSorting
         headerFilters
         rows={rows}
@@ -268,7 +268,7 @@ const useDataGridUrlState = (
   const serialize = (data: any) => JSON.stringify(data);
   const deserialize = (string: string) => JSON.parse(string);
 
-  const setSortModel = (model: GridSortModel) => {
+  const handleSortModel = (model: GridSortModel) => {
     if (model.length) {
       searchParams.set(SearchParamNames.SortModel, serialize(model));
     } else {
@@ -284,7 +284,7 @@ const useDataGridUrlState = (
     ? deserialize(serializedSortModel)
     : [];
 
-  const setFilterModel = (model: GridFilterModel) => {
+  const handleFilterModelChange = (model: GridFilterModel) => {
     searchParams.delete(SearchParamNames.PaginationModel);
     if (!model.items.length) {
       searchParams.delete(SearchParamNames.FilterModel);
@@ -302,15 +302,11 @@ const useDataGridUrlState = (
         items: [],
       };
 
-  const setPaginationModel = (model: GridPaginationModel) => {
-    // datagrid sometimes fires onPaginationModelChange
-    // with a model that has a page size of zero
-    // even if autoPageSize is enabled
-    // and there is room to fit more rows on the page than zero
-    // so I ignore this pageSize because it is incorrect
-    if (model.pageSize && autoPageSize) {
-      setAutoCalculatedPageSize(model.pageSize);
-    }
+  const handlePaginationModelChange = (model: GridPaginationModel) => {
+    // uncomment lines to fix the bug
+    //if (model.pageSize && autoPageSize) {
+    setAutoCalculatedPageSize(model.pageSize);
+    //}
 
     searchParams.set(SearchParamNames.PaginationModel, serialize(model));
 
@@ -345,11 +341,11 @@ const useDataGridUrlState = (
 
   return {
     sortModel,
-    setSortModel,
+    handleSortModel,
     paginationModel,
-    setPaginationModel,
+    handlePaginationModelChange,
     filterModel,
-    setFilterModel,
+    handleFilterModelChange,
     goToPage,
     autoCalculatedPageSize,
   };
