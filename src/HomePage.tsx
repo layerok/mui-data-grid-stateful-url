@@ -303,10 +303,14 @@ const useDataGridUrlState = (
       };
 
   const setPaginationModel = (model: GridPaginationModel) => {
-    // uncomment lines below to fix the bug
-    //if (model.pageSize) {
-    setAutoCalculatedPageSize(model.pageSize);
-    //}
+    // datagrid sometimes fires onPaginationModelChange
+    // with a model that has a page size of zero
+    // even if autoPageSize is enabled
+    // and there is room to fit more rows on the page than zero
+    // so I ignore this pageSize because it is incorrect
+    if (model.pageSize && autoPageSize) {
+      setAutoCalculatedPageSize(model.pageSize);
+    }
 
     searchParams.set(SearchParamNames.PaginationModel, serialize(model));
 
@@ -325,9 +329,7 @@ const useDataGridUrlState = (
 
   if (autoPageSize) {
     // if I don't reset pageSize to zero
-    // then table behaves strangely after filtering,
-    // I guess it is related to rowCount change
-    // when filtering
+    // then the table behaves strangely
     paginationModel.pageSize = 0;
   }
 
