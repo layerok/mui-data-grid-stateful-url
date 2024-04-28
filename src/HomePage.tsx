@@ -324,6 +324,10 @@ const useDataGridUrlState = (
       };
 
   if (autoPageSize) {
+    // if I don't reset pageSize to zero
+    // then table behaves strangely after filtering,
+    // I guess it is related to rowCount change
+    // when filtering
     paginationModel.pageSize = 0;
   }
 
