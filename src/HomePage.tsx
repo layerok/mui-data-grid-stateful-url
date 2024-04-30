@@ -6,10 +6,11 @@ import {
   GridRowsProp,
   GridSortModel,
   GridValidRowModel,
+  useGridApiRef,
 } from "@mui/x-data-grid-premium";
 import { useSearchParams } from "react-router-dom";
 import sortBy from "sort-by";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useLayoutEffect } from "react";
 
 const columns: GridColDef[] = [
   { field: "col1", headerName: "Column 1", width: 150 },
@@ -104,10 +105,10 @@ export const HomePage = () => {
     sortModel,
     setSortModel,
     goToPage,
-    autoCalculatedPageSize,
   } = useDataGridUrlState();
 
-  const { page } = paginationModel;
+  const { page, pageSize } = paginationModel;
+  const apiRef = useGridApiRef();
 
   const [data, setData] = useState<Data | null>(null);
   const [previousData, setPreviousData] = useState<Data | null>(null);
@@ -115,11 +116,13 @@ export const HomePage = () => {
   const [loading, setLoading] = useState(false);
 
   const params = {
-    offset: page * autoCalculatedPageSize,
-    limit: autoCalculatedPageSize,
+    offset: page * pageSize,
+    limit: pageSize,
     filter: convertFilterModalToBackendFilters(filterModel),
     sort: convertSortModalToBackendSort(sortModel),
   };
+
+  console.log("params", params);
 
   useEffect(() => {
     setLoading(true);
@@ -137,13 +140,24 @@ export const HomePage = () => {
   const rows = (data || previousData)?.data || [];
   const rowCount = (data || previousData)?.count || 0;
 
-  // I can't paginate rows when autoCalculatedPageSize is zero
-  // therefore I fetch all rows on a single page
-  const totalPages = autoCalculatedPageSize
-    ? Math.ceil(rowCount / autoCalculatedPageSize)
-    : 1;
+  const totalPages = pageSize ? Math.ceil(rowCount / pageSize) : 1;
 
-  const pageSize = autoCalculatedPageSize || rowCount;
+  useLayoutEffect(() => {
+    return apiRef?.current.subscribeEvent("viewportInnerSizeChange", () => {
+      const dimensions = apiRef.current.getRootDimensions();
+
+      const computedPageSize = Math.floor(
+        dimensions.viewportInnerSize.height / dimensions.rowHeight,
+      );
+
+      console.log("page", computedPageSize);
+
+      setPaginationModel({
+        page,
+        pageSize: computedPageSize,
+      });
+    });
+  }, [apiRef]);
 
   return (
     <div>
@@ -162,19 +176,19 @@ export const HomePage = () => {
             <HelperPaginationText
               count={rowCount}
               page={page + 1}
-              pageSize={pageSize}
+              pageSize={pageSize || rowCount}
             />
           </div>
         )}
       </div>
       <DataGridPremium
+        apiRef={apiRef}
         sx={{
           height: 300,
         }}
         rowCount={rowCount}
         pagination
         loading={loading}
-        autoPageSize
         hideFooterPagination
         hideFooter
         paginationMode={"server"}
@@ -257,12 +271,10 @@ const useDataGridUrlState = (
   props: {
     page?: number;
     pageSize?: number;
-    autoPageSize?: boolean;
   } = {},
 ) => {
-  const { page = 0, pageSize = 25, autoPageSize = true } = props;
+  const { page = 0, pageSize = 25 } = props;
   const [searchParams, setSearchParams] = useSearchParams();
-  const [autoCalculatedPageSize, setAutoCalculatedPageSize] = useState(0);
 
   // eslint-disable-next-line
   const serialize = (data: any) => JSON.stringify(data);
@@ -303,15 +315,6 @@ const useDataGridUrlState = (
       };
 
   const setPaginationModel = (model: GridPaginationModel) => {
-    // datagrid sometimes fires onPaginationModelChange
-    // with a model that has a page size of zero
-    // even if autoPageSize is enabled
-    // and there is room to fit more rows on the page than zero
-    // so I ignore this pageSize because it is incorrect
-    if (model.pageSize && autoPageSize) {
-      setAutoCalculatedPageSize(model.pageSize);
-    }
-
     searchParams.set(SearchParamNames.PaginationModel, serialize(model));
 
     setSearchParams(searchParams);
@@ -327,16 +330,11 @@ const useDataGridUrlState = (
         pageSize,
       };
 
-  if (autoPageSize) {
-    // if I don't reset pageSize to zero
-    // then the table behaves strangely
-    paginationModel.pageSize = 0;
-  }
-
   const goToPage = (page: number) => {
     searchParams.set(
       SearchParamNames.PaginationModel,
       serialize({
+        ...paginationModel,
         page,
       }),
     );
@@ -351,6 +349,5 @@ const useDataGridUrlState = (
     filterModel,
     setFilterModel,
     goToPage,
-    autoCalculatedPageSize,
   };
 };
