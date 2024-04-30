@@ -150,8 +150,6 @@ export const HomePage = () => {
         dimensions.viewportInnerSize.height / dimensions.rowHeight,
       );
 
-      console.log("page", computedPageSize);
-
       setPaginationModel({
         page,
         pageSize: computedPageSize,
@@ -297,7 +295,13 @@ const useDataGridUrlState = (
     : [];
 
   const setFilterModel = (model: GridFilterModel) => {
-    searchParams.delete(SearchParamNames.PaginationModel);
+    searchParams.set(
+      SearchParamNames.PaginationModel,
+      serialize({
+        ...paginationModel,
+        page: 0,
+      }),
+    );
     if (!model.items.length) {
       searchParams.delete(SearchParamNames.FilterModel);
     } else {
